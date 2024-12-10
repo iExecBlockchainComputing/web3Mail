@@ -67,10 +67,34 @@ async function start() {
   validateProtectedData(protectedData);
 
   // 2- Third-party validation service (Mailgun)
-  await validateEmailAddress({
+  const { isEmailAddressValid, result } = await validateEmailAddress({
     emailAddress: protectedData.email,
     mailgunApiKey: appDeveloperSecret.MAILGUN_APIKEY,
   });
+
+  if (isEmailAddressValid === false) {
+    await writeTaskOutput(
+      `${workerEnv.IEXEC_OUT}/result.txt`,
+      JSON.stringify(
+        {
+          message:
+            'The protected email address seems to be invalid. See task logs for more information.',
+          ...result,
+          // Don't include email address
+          address: undefined,
+        },
+        null,
+        2
+      )
+    );
+    await writeTaskOutput(
+      `${workerEnv.IEXEC_OUT}/computed.json`,
+      JSON.stringify({
+        'deterministic-output-path': `${workerEnv.IEXEC_OUT}/result.txt`,
+      })
+    );
+    return;
+  }
 
   const encryptedEmailContent = await downloadEncryptedContent(
     requesterSecret.emailContentMultiAddr
